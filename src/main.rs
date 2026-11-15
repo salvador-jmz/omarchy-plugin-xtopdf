@@ -186,8 +186,101 @@ fn capture(browser: &mut cdp::Browser, session: &str) -> Result<Article, String>
     let mut article: Article =
         serde_json::from_slice(&encoded).map_err(|_| "The article format is unsupported.")?;
     article.source = source;
+    embed_images(
+        browser,
+        session,
+        frame,
+        &world["executionContextId"],
+        &mut article,
+    );
+    if cancelled() {
+        return Err("Cancelled.".into());
+    }
     article.html("Letter")?;
     Ok(article)
+}
+
+/// Copies each article image into the document as a data URI while the
+/// signed-in article page is still open. The print browser blocks every
+/// network request, so an image that is not embedded here cannot appear.
+fn embed_images(
+    browser: &mut cdp::Browser,
+    session: &str,
+    frame: &str,
+    context: &Value,
+    article: &mut Article,
+) {
+    let mut total = 0usize;
+    for block in article.content.iter_mut().filter(|b| b.kind == "image") {
+        // Never trust image data handed over by page-side script.
+        block.data.clear();
+        if cancelled() || total >= article::MAX_IMAGES_BYTES {
+            continue;
+        }
+        let Some(url) = article::image_url(&block.src) else {
+            continue;
+        };
+        let data = fetch_image(browser, session, context, &url)
+            .or_else(|| loaded_image(browser, session, frame, &block.src));
+        if let Some((len, uri)) = data.as_deref().and_then(article::checked_data_uri) {
+            if total + len <= article::MAX_IMAGES_BYTES {
+                total += len;
+                block.data = uri;
+            }
+        }
+    }
+}
+
+/// Downloads the full-size copy from X's media CDN inside the article page.
+fn fetch_image(
+    browser: &mut cdp::Browser,
+    session: &str,
+    context: &Value,
+    url: &str,
+) -> Option<String> {
+    let expression = format!(
+        "fetch({}, {{credentials: 'omit', cache: 'force-cache'}})\
+         .then(r => r.ok ? r.blob() : null)\
+         .then(b => !b || b.size > {} ? null : new Promise(done => {{\
+           const f = new FileReader(); f.onload = () => done(f.result); f.onerror = () => done(null); f.readAsDataURL(b);\
+         }})).catch(() => null)",
+        json!(url),
+        article::MAX_IMAGE_BYTES
+    );
+    let result = browser
+        .call(
+            Some(session),
+            "Runtime.evaluate",
+            json!({"expression":expression,"contextId":context,"awaitPromise":true,"returnByValue":true,"timeout":20000}),
+        )
+        .ok()?;
+    result["result"]["value"].as_str().map(String::from)
+}
+
+/// Falls back to the copy the page already displayed.
+fn loaded_image(
+    browser: &mut cdp::Browser,
+    session: &str,
+    frame: &str,
+    url: &str,
+) -> Option<String> {
+    use base64::Engine;
+    let result = browser
+        .call(
+            Some(session),
+            "Page.getResourceContent",
+            json!({"frameId":frame,"url":url}),
+        )
+        .ok()?;
+    let content = result["content"].as_str()?;
+    let bytes = if result["base64Encoded"].as_bool() == Some(true) {
+        base64::engine::general_purpose::STANDARD
+            .decode(content)
+            .ok()?
+    } else {
+        content.as_bytes().to_vec()
+    };
+    article::image_data_uri(&bytes)
 }
 
 fn session(url: &str, demo: bool) -> Result<(), String> {
@@ -250,7 +343,14 @@ fn session(url: &str, demo: bool) -> Result<(), String> {
                     capture(&mut browser, &page)
                 };
                 result.map(|a: Article| {
-                    emit(json!({"event":"captured","title":a.title,"byline":a.byline,"preview":a.preview(),"blocks":a.content.len(),"message":"Review the text before saving. Capture again if the article was still loading."}));
+                    let images = a.content.iter().filter(|b| b.kind == "image").count();
+                    let embedded = a.content.iter().filter(|b| b.kind == "image" && !b.data.is_empty()).count();
+                    let message = if images == embedded {
+                        "Review the text before saving. Capture again if the article was still loading.".to_string()
+                    } else {
+                        format!("Review the text before saving. {embedded} of {images} images were captured; scroll past every image, then Capture again.")
+                    };
+                    emit(json!({"event":"captured","title":a.title,"byline":a.byline,"preview":a.preview(),"blocks":a.content.len(),"images":images,"message":message}));
                     article = Some(a);
                 })
             }

@@ -255,6 +255,19 @@ mod tests {
         assert!(calls.contains("Emulation.setScriptExecutionDisabled"));
         assert!(calls.contains("Page.printToPDF"));
     }
+    /// Live check (needs Chromium): `cargo test -- --ignored`.
+    #[test]
+    #[ignore]
+    fn live_chromium_prints_embedded_images() {
+        let a: crate::article::Article =
+            serde_json::from_str(include_str!("../demo/fixtures/article.json")).unwrap();
+        let profile = tempfile::tempdir().unwrap();
+        let exe = Path::new("/usr/lib/chromium/chromium");
+        let mut browser = Browser::launch(exe, profile.path(), true).unwrap();
+        let pdf = browser.pdf(&a.html("Letter").unwrap(), "Letter").unwrap();
+        let text = String::from_utf8_lossy(&pdf);
+        assert!(text.contains("/Subtype /Image"), "image missing from PDF");
+    }
     #[test]
     fn closed_pipe_is_an_error() {
         let profile = tempfile::tempdir().unwrap();

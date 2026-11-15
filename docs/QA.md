@@ -37,13 +37,15 @@ unverified. Omakit/marketplace baseline and remote CI have not run.
 5. Repeat with A4. Attempt the same filename: previous bytes remain unchanged.
 6. Open a real X Article. Sign in only in its separate Chromium window. Scroll
    through the full article, return to the panel, Capture, compare title/body/end,
-   then export and compare the PDF. An ordinary post should fail clearly.
+   then export and compare the PDF. The PDF title must be the article title (not
+   the author) and appear once; every article image appears in place. An ordinary post should fail clearly.
 7. Close the article browser, try Capture, end session and retry. Hide/reopen
    during loading/export. End session while idle/capturing/printing; verify no
    dedicated Chromium processes survive. Repeat during plugin disable/reload.
 8. Confirm a second monitor cannot start a second profile session.
 9. Run DOM fixtures with `node tests/build-browser-tests.cjs /tmp/xtopdf-dom-tests.html`
    then `chromium /tmp/xtopdf-dom-tests.html`. Expect ALL PASSED.
+   `cargo test -- --ignored` prints the fixture (with its image) through real Chromium.
 10. Remove plugin. Check normal browser/Hyprland settings are unchanged and PDFs
     remain. Dedicated sign-in/profile remains only in the documented data folder.
 
