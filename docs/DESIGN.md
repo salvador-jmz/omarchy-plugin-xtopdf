@@ -67,6 +67,13 @@ Network: X and the resources loaded by its browser page. No conversion service.
 - No session or renderer processes remain after cancellation/disablement.
 - Complete live validation before a release or marketplace submission.
 
+Images: the extractor records pbs.twimg.com media URLs in reading order (avatars,
+emoji and cards excluded). While the signed-in article page is open, Rust
+downloads each one inside that page (falling back to the copy the page already
+displayed), checks the bytes are PNG/JPEG/GIF/WebP and size-capped, and stores a
+data URI. The renderer's CSP allows `img-src data:` only, so network blocking is
+unchanged and page script can never supply image bytes.
+
 Deferred: extension bridge, automatic use of existing signed-in tabs, arbitrary
-web pages, threads, images, visual in-panel PDF preview, batch export, packaging
+web pages, threads, visual in-panel PDF preview, batch export, packaging
 into a pacman repository and marketplace submission.

@@ -74,12 +74,16 @@ One capture session at a time is enforced across monitors.
 
 ## What it preserves
 
-Headings, emphasis, HTTP(S) links, lists, quotes, code and repeated paragraphs.
-Code stays in the original reading order. Output is two columns with 9 pt serif
+The article title, headings, emphasis, HTTP(S) links, lists, quotes, code,
+repeated paragraphs and article images. Code and images stay in the original
+reading order. Images are copied from X's media server (pbs.twimg.com) at
+capture time and embedded in the PDF; scroll past every image before Capture so
+X has loaded it. If an image could not be captured, the PDF shows a labelled
+placeholder and the panel says how many images are missing. Output is two columns with 9 pt serif
 body text. Times New Roman is used if installed; otherwise the system's Times
 or serif fallback is used. A4 is an addition to upstream's Letter format.
 
-Ordinary posts, threads, images, embedded video, interactive content and exact
+Ordinary posts, threads, embedded video, interactive content and exact
 nested-list numbering are outside this preview. The review pane shows up to
 16,000 characters; the PDF contains the complete captured document. There is no
 guarantee that X has loaded every block: compare with the original article.
@@ -93,7 +97,8 @@ still receive the requests needed to display that page. The plugin has no
 conversion server, telemetry, cookie import or TCP debugging listener.
 A private inherited pipe connects Rust to Chromium.
 PDF rendering uses a fresh headless profile, blocks document network requests,
-disables scripts and only receives generated, escaped article markup.
+disables scripts and only receives generated, escaped article markup. Article
+images reach it only as verified PNG/JPEG/GIF/WebP data embedded by the helper.
 
 The dedicated X sign-in lives in
 `${XDG_DATA_HOME:-~/.local/share}/x-to-pdf/chromium/`, protected by an owner-only
